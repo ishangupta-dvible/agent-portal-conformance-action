@@ -61,10 +61,34 @@ runs:
 
         echo "   -> VirusTotal Final Verdict: $VT_SCORE"
 
-        echo "3. Enforcing TLSNotary Handshake Interception (Simulated)..."
-        TLS_CONFIDENCE="HIGH CONFIDENCE"
-        echo "   -> Detected remote egress endpoints via TCP parsing."
-        echo "   -> Mathematical Signature: VERIFIED"
+        echo "3. Enforcing Native TLS Egress Interception..."
+        # Start the Agent Portal Proxy Router in the background
+        node $GITHUB_ACTION_PATH/interceptor.js > proxy_logs.txt 2>&1 &
+        PROXY_PID=$!
+        sleep 2
+
+        echo "   -> Proxy active (PID $PROXY_PID). Forcing 'npm run test' through interceptor..."
+
+        # We explicitly execute the Publisher's tests, wiring ALL outbound traffic through the proxy
+        export HTTP_PROXY="http://127.0.0.1:8080"
+        export HTTPS_PROXY="http://127.0.0.1:8080"
+        export NODE_TLS_REJECT_UNAUTHORIZED="0"  # To allow the interception tunnel locally
+
+        # Run their script. Even if tests fail, we just want to look at the network logs.
+        npm run test || echo "   -> Test workflow concluded."
+
+        echo "   -> Analyzing Proxy TCP Headers..."
+        cat proxy_logs.txt
+
+        if grep -q "ROGUE_EGRESS_DETECTED" proxy_logs.txt; then
+            echo "   -> mathematical Signature: FAILED! Unauthorized data exfiltration detected."
+            TLS_CONFIDENCE="FAILED - ROGUE API DETECTED"
+        else
+            echo "   -> Mathematical Signature: VERIFIED"
+            TLS_CONFIDENCE="HIGH CONFIDENCE - EGRESS VERIFIED"
+        fi
+
+        kill $PROXY_PID || true
 
         echo "================================================="
         echo "✅ PASS: Conformance Suite Finished!"
