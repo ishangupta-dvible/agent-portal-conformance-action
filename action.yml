@@ -83,6 +83,8 @@ runs:
         if grep -q "ROGUE_EGRESS_DETECTED" proxy_logs.txt; then
             echo "   -> mathematical Signature: FAILED! Unauthorized data exfiltration detected."
             TLS_CONFIDENCE="FAILED - ROGUE API DETECTED"
+            kill $PROXY_PID || true
+            exit 1
         else
             echo "   -> Mathematical Signature: VERIFIED"
             TLS_CONFIDENCE="HIGH CONFIDENCE - EGRESS VERIFIED"
