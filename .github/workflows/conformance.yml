@@ -93,8 +93,22 @@ jobs:
           fi
           OPENCLAW_JSON=$(cat openclaw_assessment.json)
           echo "   -> OpenClaw Scan Complete."
+          
+          echo "VT_SCORE=$VT_SCORE" >> $GITHUB_ENV
+          echo 'OPENCLAW_JSON='"$OPENCLAW_JSON" >> $GITHUB_ENV
+          echo "OPENCLAW_JSON_RAW<<EOF" >> $GITHUB_ENV
+          cat openclaw_assessment.json >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
-          echo "4. Enforcing Native TLS Egress Interception..."
+        env:
+          SKILL_SCANNER_LLM_API_KEY: ${{ inputs.skill_scanner_llm_api_key }}
+          SKILL_SCANNER_LLM_MODEL: ${{ inputs.skill_scanner_llm_model }}
+          AI_DEFENSE_API_KEY: ${{ inputs.ai_defense_api_key }}
+
+      - name: Enforcing Native TLS Egress Interception
+        id: proxy_test
+        continue-on-error: true
+        run: |
           node .agent-portal-conformance-action/interceptor.js > proxy_logs.txt 2>&1 &
           PROXY_PID=$!
           sleep 2
@@ -108,33 +122,12 @@ jobs:
           echo "   -> Analyzing Proxy TCP Headers..."
           if grep -q "ROGUE_EGRESS_DETECTED" proxy_logs.txt; then
               echo "   -> mathematical Signature: FAILED! Unauthorized data exfiltration detected."
-              TLS_CONFIDENCE="FAILED - ROGUE API DETECTED"
               kill $PROXY_PID || true
               exit 1
           else
               echo "   -> Mathematical Signature: VERIFIED"
-              TLS_CONFIDENCE="HIGH CONFIDENCE - EGRESS VERIFIED"
+              kill $PROXY_PID || true
           fi
-
-          kill $PROXY_PID || true
-
-          echo "================================================="
-          echo "✅ PASS: Conformance Suite Finished!"
-          echo "================================================="
-
-          echo '{' > conformance-payload.json
-          echo '   "test_suite_version": "v1.0.0",' >> conformance-payload.json
-          echo '   "passed": true,' >> conformance-payload.json
-          echo '   "metrics": {' >> conformance-payload.json
-          echo '       "virustotal_scan_result": "'"$VT_SCORE"'",' >> conformance-payload.json
-          echo '       "tlsnotary_confidence": "'"$TLS_CONFIDENCE"'",' >> conformance-payload.json
-          echo '       "openclaw_assessment": '"$OPENCLAW_JSON" >> conformance-payload.json
-          echo '   }' >> conformance-payload.json
-          echo '}' >> conformance-payload.json
-        env:
-          SKILL_SCANNER_LLM_API_KEY: ${{ inputs.skill_scanner_llm_api_key }}
-          SKILL_SCANNER_LLM_MODEL: ${{ inputs.skill_scanner_llm_model }}
-          AI_DEFENSE_API_KEY: ${{ inputs.ai_defense_api_key }}
 
       - name: Request OIDC ID Token from GitHub Actions
         uses: actions/github-script@v7
@@ -146,6 +139,32 @@ jobs:
 
       - name: Telemetry Verification Injection
         run: |
+          if [ "${{ steps.proxy_test.outcome }}" == "failure" ]; then
+              TLS_CONFIDENCE="FAILED - ROGUE API DETECTED"
+              PASSED=false
+          else
+              TLS_CONFIDENCE="HIGH CONFIDENCE - EGRESS VERIFIED"
+              PASSED=true
+          fi
+          
+          if [ "$VT_SCORE" == "MALICIOUS" ]; then
+              PASSED=false
+          fi
+
+          echo "================================================="
+          echo "🏁 Conformance Suite Finished! Overall Result: $PASSED"
+          echo "================================================="
+
+          echo '{' > conformance-payload.json
+          echo '   "test_suite_version": "v1.0.0",' >> conformance-payload.json
+          echo '   "passed": '"$PASSED"',' >> conformance-payload.json
+          echo '   "metrics": {' >> conformance-payload.json
+          echo '       "virustotal_scan_result": "'"$VT_SCORE"'",' >> conformance-payload.json
+          echo '       "tlsnotary_confidence": "'"$TLS_CONFIDENCE"'",' >> conformance-payload.json
+          echo '       "openclaw_assessment": '"$OPENCLAW_JSON_RAW" >> conformance-payload.json
+          echo '   }' >> conformance-payload.json
+          echo '}' >> conformance-payload.json
+
           API_ROUTE="https://dvi-ap-ishan.vercel.app/api/v1/conformance"
           
           # Send the conformance-payload.json to the API Route
