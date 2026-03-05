@@ -1,15 +1,8 @@
 const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
 
 async function main() {
     const apiKey = process.env.SKILL_SCANNER_LLM_API_KEY;
     const model = process.env.SKILL_SCANNER_LLM_MODEL || "gpt-4o-mini";
-
-    // Simulate Cisco 'skill-scanner' CLI execution wrapper
-    // In a production environment, this would cleanly pipe out from `skill-scanner`
-    // Since we are mocking the Cisco executable locally, we will directly call the LLM 
-    // to map the intelligence into the strict 5-point ClawdHub format.
 
     let codebase = "";
     try {
@@ -18,9 +11,7 @@ async function main() {
         if (fs.existsSync('package.json')) codebase += `\n--- package.json ---\n${fs.readFileSync('package.json', 'utf8')}\n`;
         if (fs.existsSync('agent.js')) codebase += `\n--- agent.js ---\n${fs.readFileSync('agent.js', 'utf8')}\n`;
         if (fs.existsSync('index.js')) codebase += `\n--- index.js ---\n${fs.readFileSync('index.js', 'utf8')}\n`;
-    } catch (e) {
-        // Ignore read errors for missing files
-    }
+    } catch (e) { }
 
     if (!apiKey) {
         console.log(JSON.stringify({
@@ -37,10 +28,9 @@ async function main() {
     const payload = {
         model: model,
         response_format: { type: "json_object" },
-        messages: [
-            {
-                role: "system",
-                content: `You are the Cisco AI Defense Skill Scanner. Analyze the provided codebase and generate a strict 5-point OpenClaw semantic audit JSON.
+        messages: [{
+            role: "system",
+            content: `You are the Cisco AI Defense Skill Scanner. Analyze the provided codebase and generate a strict 5-point OpenClaw semantic audit JSON.
 Your JSON output MUST exactly match this schema:
 {
   "purpose": "A 1-2 sentence evaluation of Purpose & Capability.",
@@ -50,22 +40,16 @@ Your JSON output MUST exactly match this schema:
   "persistence": "A 1-2 sentence evaluation of Persistence & Privilege.",
   "assessment_summary": "A final paragraph assessing trust and risk."
 }`
-            },
-            {
-                role: "user",
-                content: `Please analyze this skill codebase:\n${codebase}`
-            }
-        ]
+        }, {
+            role: "user",
+            content: `Please analyze this skill codebase:\n${codebase}`
+        }]
     };
 
     try {
-        // If the model is an Anthropic model, we would use api.anthropic.com. For simplicity we assume OpenAI standard format.
         const res = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`
-            },
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
             body: JSON.stringify(payload)
         });
 
@@ -76,12 +60,11 @@ Your JSON output MUST exactly match this schema:
 
         const data = await res.json();
         const output = data.choices[0].message.content;
-
-        // Parse to ensure it's valid JSON
-        JSON.parse(output);
+        JSON.parse(output); // Validate JSON
         console.log(output);
     } catch (e) {
-        console.error(JSON.stringify({
+        // Output fallback JSON purely to stdout so the workflow can safely jq/cat it into the DB
+        console.log(JSON.stringify({
             purpose: "ERROR",
             instruction_scope: "ERROR",
             install_mechanism: "ERROR",
@@ -91,5 +74,4 @@ Your JSON output MUST exactly match this schema:
         }));
     }
 }
-
 main();
