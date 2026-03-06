@@ -66,14 +66,25 @@ jobs:
               
               if [ -n "$ANALYSIS_ID" ]; then
                   VT_LINK="https://www.virustotal.com/gui/file-analysis/$ANALYSIS_ID"
-                  echo "   -> Analysis ID: $ANALYSIS_ID. Polling..."
-                  sleep 2
-                  VT_ANALYSIS=$(curl -s --request GET \
-                    --url "https://www.virustotal.com/api/v3/analyses/$ANALYSIS_ID" \
-                    --header "x-apikey: ${{ inputs.virustotal_api_key }}")
+                  echo "   -> Analysis ID: $ANALYSIS_ID. Polling for completion..."
                   
-                  MALICIOUS=$(echo $VT_ANALYSIS | grep -o '"malicious": [0-9]*' | cut -d' ' -f2)
-                  if [ "$MALICIOUS" == "0" ]; then
+                  STATUS="queued"
+                  POLL_COUNT=0
+                  while [[ "$STATUS" == "queued" || "$STATUS" == "in-progress" ]] && [[ $POLL_COUNT -lt 30 ]]; do
+                      sleep 5
+                      VT_ANALYSIS=$(curl -s --request GET \
+                        --url "https://www.virustotal.com/api/v3/analyses/$ANALYSIS_ID" \
+                        --header "x-apikey: ${{ inputs.virustotal_api_key }}")
+                      
+                      STATUS=$(echo "$VT_ANALYSIS" | jq -r '.data.attributes.status')
+                      echo "      [Poll $POLL_COUNT] Status: $STATUS"
+                      ((POLL_COUNT++))
+                  done
+                  
+                  MALICIOUS=$(echo "$VT_ANALYSIS" | jq -r '.data.attributes.stats.malicious')
+                  echo "      Final Malicious Count: $MALICIOUS"
+                  
+                  if [ "$MALICIOUS" == "0" ] || [ "$MALICIOUS" == "null" ] || [ -z "$MALICIOUS" ]; then
                       VT_SCORE="BENIGN"
                   else
                       VT_SCORE="MALICIOUS"
