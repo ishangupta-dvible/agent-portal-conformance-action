@@ -109,7 +109,6 @@ jobs:
 
           echo "VT_SCORE=$VT_SCORE" >> $GITHUB_ENV
           echo "VT_LINK=$VT_LINK" >> $GITHUB_ENV
-          echo "OPENCLAW_JSON=$(jq -c . openclaw_assessment.json)" >> $GITHUB_ENV
 
         env:
           SKILL_SCANNER_LLM_API_KEY: ${{ inputs.skill_scanner_llm_api_key }}
@@ -173,7 +172,11 @@ jobs:
           echo '       "virustotal_scan_result": "'"$VT_SCORE"'",' >> conformance-payload.json
           echo '       "virustotal_analysis_link": "'"$VT_LINK"'",' >> conformance-payload.json
           echo '       "tlsnotary_confidence": "'"$TLS_CONFIDENCE"'",' >> conformance-payload.json
-          echo '       "openclaw_assessment": '"$OPENCLAW_JSON" >> conformance-payload.json
+
+          # Inject the JSON directly without escaping through GitHub Environments
+          echo '       "openclaw_assessment": ' >> conformance-payload.json
+          cat openclaw_assessment.json >> conformance-payload.json
+
           echo '   }' >> conformance-payload.json
           echo '}' >> conformance-payload.json
 
