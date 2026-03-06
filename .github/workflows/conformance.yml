@@ -55,6 +55,7 @@ jobs:
           VT_SCORE="UNVERIFIED"
           VT_LINK=""
 
+          set +e
           if [ -n "${{ inputs.virustotal_api_key }}" ]; then
               echo "   -> Uploading to VirusTotal (POST /api/v3/files)..."
               VT_RESPONSE=$(curl -s --request POST \
@@ -95,6 +96,7 @@ jobs:
           else
               echo "   -> Skipping VirusTotal upload: No API key provided."
           fi
+          set -e
           echo "   -> VirusTotal Final Verdict: $VT_SCORE"
 
           echo "3. Running Cisco AI Defense Skill Scanner (OpenClaw Semantic Audit)..."
