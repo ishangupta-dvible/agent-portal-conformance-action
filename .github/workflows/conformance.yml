@@ -40,7 +40,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Configure VirusTotal and LLM Integrations
         run: |
@@ -53,6 +53,7 @@ jobs:
           ZIP_NAME="source.zip"
           zip -r $ZIP_NAME . -x "node_modules/*" ".git/*" ".agent-portal-conformance-action/*"
           VT_SCORE="UNVERIFIED"
+          VT_LINK=""
 
           if [ -n "${{ inputs.virustotal_api_key }}" ]; then
               echo "   -> Uploading to VirusTotal (POST /api/v3/files)..."
@@ -64,6 +65,7 @@ jobs:
               ANALYSIS_ID=$(echo $VT_RESPONSE | grep -o '"id": "[^"]*' | cut -d'"' -f4)
               
               if [ -n "$ANALYSIS_ID" ]; then
+                  VT_LINK="https://www.virustotal.com/gui/file-analysis/$ANALYSIS_ID"
                   echo "   -> Analysis ID: $ANALYSIS_ID. Polling..."
                   sleep 2
                   VT_ANALYSIS=$(curl -s --request GET \
@@ -93,8 +95,9 @@ jobs:
           fi
           OPENCLAW_JSON=$(cat openclaw_assessment.json)
           echo "   -> OpenClaw Scan Complete."
-          
+
           echo "VT_SCORE=$VT_SCORE" >> $GITHUB_ENV
+          echo "VT_LINK=$VT_LINK" >> $GITHUB_ENV
           echo 'OPENCLAW_JSON='"$OPENCLAW_JSON" >> $GITHUB_ENV
           echo "OPENCLAW_JSON_RAW<<EOF" >> $GITHUB_ENV
           cat openclaw_assessment.json >> $GITHUB_ENV
@@ -146,7 +149,7 @@ jobs:
               TLS_CONFIDENCE="HIGH CONFIDENCE - EGRESS VERIFIED"
               PASSED=true
           fi
-          
+
           if [ "$VT_SCORE" == "MALICIOUS" ]; then
               PASSED=false
           fi
@@ -160,13 +163,14 @@ jobs:
           echo '   "passed": '"$PASSED"',' >> conformance-payload.json
           echo '   "metrics": {' >> conformance-payload.json
           echo '       "virustotal_scan_result": "'"$VT_SCORE"'",' >> conformance-payload.json
+          echo '       "virustotal_analysis_link": "'"$VT_LINK"'",' >> conformance-payload.json
           echo '       "tlsnotary_confidence": "'"$TLS_CONFIDENCE"'",' >> conformance-payload.json
           echo '       "openclaw_assessment": '"$OPENCLAW_JSON_RAW" >> conformance-payload.json
           echo '   }' >> conformance-payload.json
           echo '}' >> conformance-payload.json
 
           API_ROUTE="https://dvi-ap-ishan.vercel.app/api/v1/conformance"
-          
+
           # Send the conformance-payload.json to the API Route
           curl -X POST $API_ROUTE \
             -H "Content-Type: application/json" \
