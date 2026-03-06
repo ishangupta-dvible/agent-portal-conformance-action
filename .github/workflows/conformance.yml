@@ -42,6 +42,11 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
       - name: Configure VirusTotal and LLM Integrations
         run: |
           npm install -D adm-zip node-fetch@2
@@ -101,10 +106,11 @@ jobs:
 
           echo "3. Running Cisco AI Defense Skill Scanner (OpenClaw Semantic Audit)..."
           if [ -n "${{ inputs.skill_scanner_llm_api_key }}" ]; then
-              node .agent-portal-conformance-action/run_cisco_scanner.js > openclaw_assessment.json
+              python -m pip install cisco-ai-skill-scanner
+              skill-scanner scan . --use-llm --format json --output openclaw_assessment.json || true
           else
               echo "   -> Skipping OpenClaw scan: No 'skill_scanner_llm_api_key' provided."
-              echo '{"purpose": "UNVERIFIED", "instruction_scope": "UNVERIFIED", "install_mechanism": "UNVERIFIED", "credentials": "UNVERIFIED", "persistence": "UNVERIFIED", "assessment_summary": "Unverified."}' > openclaw_assessment.json
+              echo '{"max_severity": "UNVERIFIED", "is_safe": false, "findings": [{"analyzer": "Error", "category": "Configuration", "severity": "UNVERIFIED", "description": "No skill_scanner_llm_api_key provided.", "id": "error"}]}' > openclaw_assessment.json
           fi
           OPENCLAW_JSON=$(cat openclaw_assessment.json)
           echo "   -> OpenClaw Scan Complete."
