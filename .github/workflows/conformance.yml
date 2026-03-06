@@ -109,7 +109,9 @@ jobs:
 
           echo "VT_SCORE=$VT_SCORE" >> $GITHUB_ENV
           echo "VT_LINK=$VT_LINK" >> $GITHUB_ENV
-          echo 'OPENCLAW_JSON='"$OPENCLAW_JSON" >> $GITHUB_ENV
+          echo "OPENCLAW_JSON<<EOF" >> $GITHUB_ENV
+          cat openclaw_assessment.json >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
           echo "OPENCLAW_JSON_RAW<<EOF" >> $GITHUB_ENV
           cat openclaw_assessment.json >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
