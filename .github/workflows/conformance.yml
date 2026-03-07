@@ -139,8 +139,9 @@ jobs:
 
           echo "   -> Analyzing Proxy TCP Headers..."
           if grep -q "ROGUE_EGRESS_DETECTED" proxy_logs.txt; then
-              echo "   -> Mathematical Signature: VERIFIED (Rogue egress intercepted successfully)"
+              echo "   -> Mathematical Signature: VERIFIED (Rogue egress intercepted successfully) - FORCING FAILURE FOR UI TEST"
               kill $PROXY_PID || true
+              exit 1
           else
               echo "   -> mathematical Signature: FAILED! Unauthorized data exfiltration bypassed proxy."
               kill $PROXY_PID || true
