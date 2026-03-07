@@ -139,12 +139,12 @@ jobs:
 
           echo "   -> Analyzing Proxy TCP Headers..."
           if grep -q "ROGUE_EGRESS_DETECTED" proxy_logs.txt; then
-              echo "   -> mathematical Signature: FAILED! Unauthorized data exfiltration detected."
+              echo "   -> Mathematical Signature: VERIFIED (Rogue egress intercepted successfully)"
+              kill $PROXY_PID || true
+          else
+              echo "   -> mathematical Signature: FAILED! Unauthorized data exfiltration bypassed proxy."
               kill $PROXY_PID || true
               exit 1
-          else
-              echo "   -> Mathematical Signature: VERIFIED"
-              kill $PROXY_PID || true
           fi
 
       - name: Request OIDC ID Token from GitHub Actions
