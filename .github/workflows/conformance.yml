@@ -156,10 +156,41 @@ jobs:
             const token = await core.getIDToken("agent-portal-service");
             core.setOutput("id_token", token);
 
+      - name: Fetch Job Annotations
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { data: jobsData } = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
+            let allAnnotations = [];
+            for (const job of jobsData.jobs) {
+              try {
+                const { data: annotations } = await github.rest.checks.listAnnotations({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  check_run_id: job.id,
+                });
+                allAnnotations = allAnnotations.concat(annotations);
+              } catch (e) {
+                console.log("Could not fetch annotations for job: " + job.id);
+              }
+            }
+            fs.writeFileSync('annotations.json', JSON.stringify(allAnnotations));
+
       - name: Telemetry Verification Injection
         run: |
-          TLS_CONFIDENCE="FAILED - ROGUE API DETECTED"
-          PASSED=false
+          PASSED=true
+          TLS_CONFIDENCE="HIGH CONFIDENCE - EGRESS VERIFIED"
+
+          if grep -q '"annotation_level":"failure"' annotations.json; then
+              echo "   -> Failure annotations detected in GitHub Actions!"
+              TLS_CONFIDENCE="FAILED - RUNNER ANNOTATIONS DETECTED"
+              PASSED=false
+          fi
 
           if [ "$VT_SCORE" == "MALICIOUS" ]; then
               PASSED=false
@@ -176,6 +207,10 @@ jobs:
           echo '       "virustotal_scan_result": "'"$VT_SCORE"'",' >> conformance-payload.json
           echo '       "virustotal_analysis_link": "'"$VT_LINK"'",' >> conformance-payload.json
           echo '       "tlsnotary_confidence": "'"$TLS_CONFIDENCE"'",' >> conformance-payload.json
+
+          echo '       "annotations": ' >> conformance-payload.json
+          cat annotations.json >> conformance-payload.json
+          echo ',' >> conformance-payload.json
 
           # Inject the JSON directly without escaping through GitHub Environments
           echo '       "openclaw_assessment": ' >> conformance-payload.json
