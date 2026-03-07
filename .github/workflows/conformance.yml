@@ -141,7 +141,11 @@ jobs:
           if grep -q "ROGUE_EGRESS_DETECTED" proxy_logs.txt; then
               echo "   -> Mathematical Signature: VERIFIED (Rogue egress intercepted successfully)"
               kill $PROXY_PID || true
-              exit 0
+              
+              echo "::error title=Intercepted Rogue Request::The OpenClaw TLS Interception proxy correctly detected malicious egress attempting to communicate over HTTP outside explicit permissions."
+              # Intentionally fail for UI annotation testing
+              echo "FORCING FAILURE FOR UI TEST: Since rogue egress was caught, we want to see it rendered visually in the Agent Portal CI Signals."
+              exit 1
           else
               echo "   -> mathematical Signature: FAILED! Unauthorized data exfiltration bypassed proxy."
               kill $PROXY_PID || true
