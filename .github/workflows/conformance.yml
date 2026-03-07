@@ -145,12 +145,15 @@ jobs:
               kill $PROXY_PID || true
               
               echo "::error title=Intercepted Rogue Request::The OpenClaw TLS Interception proxy correctly detected malicious egress attempting to communicate over HTTP outside explicit permissions."
+              echo "PROXY_CAUGHT_EGRESS=true" >> "$GITHUB_ENV"
+              
               # Intentionally fail for UI annotation testing
               echo "FORCING FAILURE FOR UI TEST: Since rogue egress was caught, we want to see it rendered visually in the Agent Portal CI Signals."
               exit 1
           else
               echo "   -> mathematical Signature: FAILED! Unauthorized data exfiltration bypassed proxy."
               kill $PROXY_PID || true
+              echo "PROXY_CAUGHT_EGRESS=false" >> "$GITHUB_ENV"
               exit 1
           fi
 
@@ -185,7 +188,7 @@ jobs:
                 console.log("Could not fetch annotations for job: " + job.id);
               }
             }
-            if (allAnnotations.length === 0 && '${{ steps.proxy_test.outcome }}' !== 'success') {
+            if (allAnnotations.length === 0 && process.env.PROXY_CAUGHT_EGRESS === 'true') {
               allAnnotations.push({
                 path: "interceptor.js",
                 start_line: 1,
@@ -202,9 +205,9 @@ jobs:
           PASSED=true
           TLS_CONFIDENCE="HIGH CONFIDENCE - EGRESS VERIFIED"
 
-          if [ "${{ steps.proxy_test.outcome }}" != "success" ] && [ "$TLS_CONFIDENCE" == "HIGH CONFIDENCE - EGRESS VERIFIED" ]; then
-              echo "   -> Failure annotations detected in GitHub Actions!"
-              TLS_CONFIDENCE="FAILED - RUNNER ANNOTATIONS DETECTED"
+          if [ "$PROXY_CAUGHT_EGRESS" != "true" ]; then
+              echo "   -> Proxy failed to intercept rogue egress!"
+              TLS_CONFIDENCE="FAILED - UNAUTHORIZED EGRESS DETECTED"
               PASSED=false
           fi
 
