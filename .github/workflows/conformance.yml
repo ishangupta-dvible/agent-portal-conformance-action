@@ -158,13 +158,8 @@ jobs:
 
       - name: Telemetry Verification Injection
         run: |
-          if [ "${{ steps.proxy_test.outcome }}" != "success" ]; then
-              TLS_CONFIDENCE="FAILED - ROGUE API DETECTED"
-              PASSED=false
-          else
-              TLS_CONFIDENCE="HIGH CONFIDENCE - EGRESS VERIFIED"
-              PASSED=true
-          fi
+          TLS_CONFIDENCE="FAILED - ROGUE API DETECTED"
+          PASSED=false
 
           if [ "$VT_SCORE" == "MALICIOUS" ]; then
               PASSED=false
