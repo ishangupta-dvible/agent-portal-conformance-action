@@ -47,7 +47,7 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Configure VirusTotal and LLM Integrations
+      - name: Run VirusTotal Pipeline Scan
         run: |
           npm install -D adm-zip node-fetch@2
 
@@ -104,7 +104,12 @@ jobs:
           set -e
           echo "   -> VirusTotal Final Verdict: $VT_SCORE"
 
-          echo "3. Running Cisco AI Defense Skill Scanner (OpenClaw Semantic Audit)..."
+          echo "VT_SCORE=$VT_SCORE" >> $GITHUB_ENV
+          echo "VT_LINK=$VT_LINK" >> $GITHUB_ENV
+
+      - name: Run Cisco AI Defense Skill Scanner
+        run: |
+          echo "Running Cisco AI Defense Skill Scanner (OpenClaw Semantic Audit)..."
           if [ -n "${{ inputs.skill_scanner_llm_api_key }}" ]; then
               python -m pip install cisco-ai-skill-scanner
               skill-scanner scan . --use-llm --format json --output openclaw_assessment.json || true
@@ -112,12 +117,7 @@ jobs:
               echo "   -> Skipping OpenClaw scan: No 'skill_scanner_llm_api_key' provided."
               echo '{"max_severity": "UNVERIFIED", "is_safe": false, "findings": [{"analyzer": "Error", "category": "Configuration", "severity": "UNVERIFIED", "description": "No skill_scanner_llm_api_key provided.", "id": "error"}]}' > openclaw_assessment.json
           fi
-          OPENCLAW_JSON=$(cat openclaw_assessment.json)
           echo "   -> OpenClaw Scan Complete."
-
-          echo "VT_SCORE=$VT_SCORE" >> $GITHUB_ENV
-          echo "VT_LINK=$VT_LINK" >> $GITHUB_ENV
-
         env:
           SKILL_SCANNER_LLM_API_KEY: ${{ inputs.skill_scanner_llm_api_key }}
           SKILL_SCANNER_LLM_MODEL: ${{ inputs.skill_scanner_llm_model }}
