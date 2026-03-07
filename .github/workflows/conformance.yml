@@ -139,9 +139,9 @@ jobs:
 
           echo "   -> Analyzing Proxy TCP Headers..."
           if grep -q "ROGUE_EGRESS_DETECTED" proxy_logs.txt; then
-              echo "   -> Mathematical Signature: VERIFIED (Rogue egress intercepted successfully) - FORCING FAILURE FOR UI TEST"
+              echo "   -> Mathematical Signature: VERIFIED (Rogue egress intercepted successfully)"
               kill $PROXY_PID || true
-              exit 1
+              exit 0
           else
               echo "   -> mathematical Signature: FAILED! Unauthorized data exfiltration bypassed proxy."
               kill $PROXY_PID || true
@@ -226,3 +226,10 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ steps.generate_oidc.outputs.id_token }}" \
             -d @conformance-payload.json
+
+      - name: Upload Conformance Telemetry Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: conformance-payload
+          path: conformance-payload.json
