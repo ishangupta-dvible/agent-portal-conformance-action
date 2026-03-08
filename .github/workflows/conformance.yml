@@ -2,6 +2,11 @@ name: "Agent Portal Conformance Reusable Workflow"
 on:
   workflow_call:
     inputs:
+      required_docs:
+        description: "Comma separated list of required documentation files"
+        type: string
+        required: false
+        default: "API.md, README.md"
       virustotal_api_key:
         description: "VirusTotal API Key"
         type: string
@@ -63,13 +68,17 @@ jobs:
           fi
 
           echo "1b. Validating Documentation Completeness..."
-          if [ -f "API.md" ] && [ -f "README.md" ]; then
-              DOCS_PASS=true
-              echo "   -> Documentation is complete."
-          else
-              DOCS_PASS=false
-              echo "   -> Documentation is incomplete."
-          fi
+          DOCS_PASS=true
+          IFS=',' read -ra ADDR <<< "${{ inputs.required_docs }}"
+          for i in "${ADDR[@]}"; do
+              doc=$(echo "$i" | xargs) # trim whitespace
+              if [ -f "$doc" ]; then
+                  echo "   -> Found required doc: $doc"
+              else
+                  echo "   -> Missing required doc: $doc"
+                  DOCS_PASS=false
+              fi
+          done
 
           echo "1c. Validating Authentication Methods..."
           if grep -q "auth_requirements" manifest.json; then
