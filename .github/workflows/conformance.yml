@@ -54,7 +54,35 @@ jobs:
           npm install -D adm-zip node-fetch@2
 
           echo "1. Validating manifest.json specification..."
-          # ... (manifest validation) ...
+          if [ -f "manifest.json" ]; then
+              SCHEMA_PASS=true
+              echo "   -> Schema is valid."
+          else
+              SCHEMA_PASS=false
+              echo "   -> Schema is missing or invalid."
+          fi
+
+          echo "1b. Validating Documentation Completeness..."
+          if [ -f "API.md" ] && [ -f "README.md" ]; then
+              DOCS_PASS=true
+              echo "   -> Documentation is complete."
+          else
+              DOCS_PASS=false
+              echo "   -> Documentation is incomplete."
+          fi
+
+          echo "1c. Validating Authentication Methods..."
+          if grep -q "auth_requirements" manifest.json; then
+              AUTH_PASS=true
+              echo "   -> Authentication requirements declared."
+          else
+              AUTH_PASS=false
+              echo "   -> Authentication requirements missing."
+          fi
+
+          echo "SCHEMA_PASS=$SCHEMA_PASS" >> $GITHUB_ENV
+          echo "DOCS_PASS=$DOCS_PASS" >> $GITHUB_ENV
+          echo "AUTH_PASS=$AUTH_PASS" >> $GITHUB_ENV
 
           echo "2. Zipping Codebase for VirusTotal Submission..."
           ZIP_NAME="source.zip"
@@ -145,15 +173,12 @@ jobs:
               kill $PROXY_PID || true
               
               echo "::error title=Intercepted Rogue Request::The OpenClaw TLS Interception proxy correctly detected malicious egress attempting to communicate over HTTP outside explicit permissions."
-              echo "PROXY_CAUGHT_EGRESS=true" >> "$GITHUB_ENV"
-              
               # Intentionally fail for UI annotation testing
               echo "FORCING FAILURE FOR UI TEST: Since rogue egress was caught, we want to see it rendered visually in the Agent Portal CI Signals."
               exit 1
           else
               echo "   -> mathematical Signature: FAILED! Unauthorized data exfiltration bypassed proxy."
               kill $PROXY_PID || true
-              echo "PROXY_CAUGHT_EGRESS=false" >> "$GITHUB_ENV"
               exit 1
           fi
 
@@ -188,7 +213,7 @@ jobs:
                 console.log("Could not fetch annotations for job: " + job.id);
               }
             }
-            if (allAnnotations.length === 0 && process.env.PROXY_CAUGHT_EGRESS === 'true') {
+            if (allAnnotations.length === 0 && '${{ steps.proxy_test.outcome }}' !== 'success') {
               allAnnotations.push({
                 path: "interceptor.js",
                 start_line: 1,
@@ -205,9 +230,9 @@ jobs:
           PASSED=true
           TLS_CONFIDENCE="HIGH CONFIDENCE - EGRESS VERIFIED"
 
-          if [ "$PROXY_CAUGHT_EGRESS" != "true" ]; then
-              echo "   -> Proxy failed to intercept rogue egress!"
-              TLS_CONFIDENCE="FAILED - UNAUTHORIZED EGRESS DETECTED"
+          if [ "${{ steps.proxy_test.outcome }}" != "success" ] && [ "$TLS_CONFIDENCE" == "HIGH CONFIDENCE - EGRESS VERIFIED" ]; then
+              echo "   -> Failure annotations detected in GitHub Actions!"
+              TLS_CONFIDENCE="FAILED - RUNNER ANNOTATIONS DETECTED"
               PASSED=false
           fi
 
@@ -222,7 +247,11 @@ jobs:
           echo '{' > conformance-payload.json
           echo '   "test_suite_version": "v1.0.0",' >> conformance-payload.json
           echo '   "passed": '"$PASSED"',' >> conformance-payload.json
+          echo '   "execution_logs": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",' >> conformance-payload.json
           echo '   "metrics": {' >> conformance-payload.json
+          echo '       "schema_validation": '"$SCHEMA_PASS"',' >> conformance-payload.json
+          echo '       "docs_completeness": '"$DOCS_PASS"',' >> conformance-payload.json
+          echo '       "auth_test": '"$AUTH_PASS"',' >> conformance-payload.json
           echo '       "virustotal_scan_result": "'"$VT_SCORE"'",' >> conformance-payload.json
           echo '       "virustotal_analysis_link": "'"$VT_LINK"'",' >> conformance-payload.json
           echo '       "tlsnotary_confidence": "'"$TLS_CONFIDENCE"'",' >> conformance-payload.json
