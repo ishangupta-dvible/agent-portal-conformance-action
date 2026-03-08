@@ -151,7 +151,17 @@ jobs:
           echo "Running Cisco AI Defense Skill Scanner (OpenClaw Semantic Audit)..."
           if [ -n "${{ inputs.skill_scanner_llm_api_key }}" ]; then
               python -m pip install cisco-ai-skill-scanner
+              echo "   -> Temporarily isolating AST workspace..."
+              mv node_modules ../temp_node_modules || true
+              mv source.zip ../temp_source.zip || true
+              mv .agent-portal-conformance-action ../temp_action || true
+              
               skill-scanner scan . --use-llm --format json --output openclaw_assessment.json || true
+              
+              echo "   -> Restoring execution environment..."
+              mv ../temp_node_modules node_modules || true
+              mv ../temp_source.zip source.zip || true
+              mv ../temp_action .agent-portal-conformance-action || true
           else
               echo "   -> Skipping OpenClaw scan: No 'skill_scanner_llm_api_key' provided."
               echo '{"max_severity": "UNVERIFIED", "is_safe": false, "findings": [{"analyzer": "Error", "category": "Configuration", "severity": "UNVERIFIED", "description": "No skill_scanner_llm_api_key provided.", "id": "error"}]}' > openclaw_assessment.json
