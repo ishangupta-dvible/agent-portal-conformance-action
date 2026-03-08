@@ -255,16 +255,12 @@ jobs:
           echo '       "virustotal_scan_result": "'"$VT_SCORE"'",' >> conformance-payload.json
           echo '       "virustotal_analysis_link": "'"$VT_LINK"'",' >> conformance-payload.json
           echo '       "tlsnotary_confidence": "'"$TLS_CONFIDENCE"'",' >> conformance-payload.json
-
           echo '       "annotations": ' >> conformance-payload.json
           cat annotations.json >> conformance-payload.json
-          echo ',' >> conformance-payload.json
+          echo '   },' >> conformance-payload.json
 
-          # Inject the JSON directly without escaping through GitHub Environments
-          echo '       "openclaw_assessment": ' >> conformance-payload.json
+          echo '   "openclaw_assessment": ' >> conformance-payload.json
           cat openclaw_assessment.json >> conformance-payload.json
-
-          echo '   }' >> conformance-payload.json
           echo '}' >> conformance-payload.json
 
           API_ROUTE="https://dvi-ap-ishan.vercel.app/api/v1/conformance"
