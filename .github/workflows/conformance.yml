@@ -2,6 +2,10 @@ name: "Agent Portal Conformance Reusable Workflow"
 on:
   workflow_call:
     inputs:
+      artifact_id:
+        description: "The Agent Portal UUID for this artifact"
+        type: string
+        required: true
       required_docs:
         description: "Comma separated list of required documentation files"
         type: string
@@ -188,17 +192,15 @@ jobs:
 
           echo "   -> Analyzing Proxy TCP Headers..."
           if grep -q "ROGUE_EGRESS_DETECTED" proxy_logs.txt; then
-              echo "   -> Mathematical Signature: VERIFIED (Rogue egress intercepted successfully)"
+              echo "   -> Mathematical Signature: FAILED! (Rogue egress intercepted successfully)"
               kill $PROXY_PID || true
               
               echo "::error title=Intercepted Rogue Request::The OpenClaw TLS Interception proxy correctly detected malicious egress attempting to communicate over HTTP outside explicit permissions."
-              # Intentionally fail for UI annotation testing
-              echo "FORCING FAILURE FOR UI TEST: Since rogue egress was caught, we want to see it rendered visually in the Agent Portal CI Signals."
               exit 1
           else
-              echo "   -> mathematical Signature: FAILED! Unauthorized data exfiltration bypassed proxy."
+              echo "   -> Mathematical Signature: VERIFIED! No unauthorized data exfiltration detected."
               kill $PROXY_PID || true
-              exit 1
+              exit 0
           fi
 
       - name: Request OIDC ID Token from GitHub Actions
@@ -264,6 +266,7 @@ jobs:
           echo "================================================="
 
           echo '{' > conformance-payload.json
+          echo '   "artifact_id": "${{ inputs.artifact_id }}",' >> conformance-payload.json
           echo '   "test_suite_version": "v1.0.0",' >> conformance-payload.json
           echo '   "passed": '"$PASSED"',' >> conformance-payload.json
           echo '   "execution_logs": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",' >> conformance-payload.json
